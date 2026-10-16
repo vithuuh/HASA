@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlmodel
+python-dotenv
+opencv-python
+numpy
+pytesseract
+google-genai
+python-multipart
