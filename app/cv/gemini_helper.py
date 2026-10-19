@@ -26,7 +26,7 @@ Identify every distinct semantic section on the page:
 1. Headers / Branding / Metadata (e.g. "apsara Date:", Module, Tutorial)
 2. Questions (all lines from question number down to the last word before the answer)
 3. Answers / Written explanations
-4. Diagrams / Schematics (describe components, inputs, outputs, equations)
+4. Diagrams / Schematics (reconstruct as ASCII art using dashes, pipes, slashes, plus signs and arrows. Include all labels, inputs, outputs, and equations inside or beside the ASCII art)
 
 For each section, you MUST provide its normalized 2D bounding box on a 0 to 1000 scale:
 - "box_2d": [ymin, xmin, ymax, xmax]
@@ -167,8 +167,10 @@ def process_region_with_gemini(crop_bgr: np.ndarray, region_type: str, raw_ocr: 
     elif region_type == "diagram":
         prompt = (
             "You are analyzing an academic answer script diagram or schematic. "
-            "Describe the diagram, its arrows, inputs, outputs, labels, and mathematical equations clearly. "
-            "If it is a network or flowchart, outline its structure cleanly in bullet points or markdown."
+            "Reconstruct the diagram as ASCII art using only plain text characters: dashes (-), pipes (|), plus signs (+), slashes (/ \\), and arrows (-> <-). "
+            "Include all labels, box titles, input/output labels, and equations positioned near their relevant parts. "
+            "Do NOT describe the diagram in prose. Do NOT use markdown code fences. "
+            "Output ONLY the raw ASCII diagram, exactly as it would appear in a monospace terminal."
         )
     else:
         prompt = (

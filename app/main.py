@@ -1,3 +1,4 @@
+import io
 import os
 import uuid
 import asyncio
@@ -49,6 +50,15 @@ async def upload_script(file: UploadFile = File(...), session: Session = Depends
         file_path = UPLOADS_DIR / unique_filename
 
         contents = await file.read()
+
+        # Reject unsupported file types early
+        ext = Path(file.filename).suffix.lower()
+        if ext not in (".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp", ".pdf"):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"Unsupported file type '{ext}'. Accepted: images or PDF."
+            )
+
         with open(file_path, "wb") as f:
             f.write(contents)
 
@@ -107,7 +117,63 @@ async def analyze_script(script_id: int, session: Session = Depends(get_session)
         session.commit()
 
         with open(script.file_path, "rb") as f:
-            image_bytes = f.read()
+            file_bytes = f.read()
+
+        # ── PDF support: convert each page to a JPEG and process independently ──
+        file_ext = Path(script.file_path).suffix.lower()
+        if file_ext == ".pdf":
+            all_sections = []
+            order_offset = 0
+            try:
+                import fitz  # PyMuPDF
+                pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                logger.info(f"PDF detected: {pdf_doc.page_count} pages for script {script_id}.")
+                for page_num in range(pdf_doc.page_count):
+                    page = pdf_doc[page_num]
+                    # Render at 2x resolution for better OCR quality
+                    mat = fitz.Matrix(2.0, 2.0)
+                    pix = page.get_pixmap(matrix=mat, alpha=False)
+                    page_img_bytes = pix.tobytes("jpeg")
+
+                    page_sections = await asyncio.to_thread(
+                        extract_full_page_with_ai, page_img_bytes, pix.width, pix.height
+                    )
+                    for sec in page_sections:
+                        sec["order_index"] = int(sec.get("order_index", 0)) + order_offset
+                        sec["title"] = f"[P{page_num + 1}] {sec.get('title', '')}"
+                    all_sections.extend(page_sections)
+                    order_offset += len(page_sections)
+                pdf_doc.close()
+            except ImportError:
+                logger.error("PyMuPDF (fitz) is not installed. Cannot process PDF.")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="PDF support requires PyMuPDF. Run: pip install pymupdf"
+                )
+
+            if all_sections:
+                all_sections = sorted(all_sections, key=lambda s: int(s.get("order_index", 0)))
+                for idx, item in enumerate(all_sections):
+                    db_region = Region(
+                        script_id=script.id,
+                        order_index=int(item.get("order_index", idx)),
+                        region_type=item.get("region_type", "text"),
+                        bbox_x=0, bbox_y=0, bbox_w=100, bbox_h=30,
+                        raw_ocr_text="",
+                        refined_content=item.get("content", ""),
+                    )
+                    session.add(db_region)
+                script.status = "completed"
+                session.add(script)
+                session.commit()
+                session.refresh(script)
+                logger.info(f"PDF analysis completed for script {script_id} ({len(all_sections)} sections across all pages).")
+                return {"status": "completed", "script_id": script.id, "total_regions": len(all_sections)}
+            else:
+                raise HTTPException(status_code=500, detail="No content could be extracted from the PDF.")
+
+        # ── Image path (existing logic) ──
+        image_bytes = file_bytes
 
         import cv2
         import numpy as np
