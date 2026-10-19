@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export async function uploadScript(file) {
     const formData = new FormData();
@@ -10,7 +10,8 @@ export async function uploadScript(file) {
     });
 
     if (!response.ok) {
-        throw new Error("Process couldn't be completed.");
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.detail || `Upload failed with status ${response.status}`);
     }
 
     return response.json();
@@ -22,7 +23,8 @@ export async function analyzeScript(scriptId) {
     });
 
     if (!response.ok) {
-        throw new Error("Process couldn't be completed.");
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.detail || `Analysis failed with status ${response.status}`);
     }
 
     return response.json();
@@ -32,8 +34,9 @@ export async function getScriptDetails(scriptId) {
     const response = await fetch(`${API_BASE_URL}/scripts/${scriptId}`);
 
     if (!response.ok) {
-        throw new Error("Process couldn't be completed.");
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.detail || `Failed to fetch details with status ${response.status}`);
     }
 
     return response.json();
-}
+}

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 
@@ -8,7 +8,7 @@ class Script(SQLModel, table=True):
     filename: str
     file_path: str
     status: str = Field(default="uploaded")  # status: uploaded, processing, completed, error
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     # Relationship to extracted regions
     regions: List["Region"] = Relationship(back_populates="script")

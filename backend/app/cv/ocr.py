@@ -3,10 +3,20 @@ import numpy as np
 import pytesseract
 import os
 
-# Explicitly set Tesseract executable path for Windows
-tesseract_cmd_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-if os.path.exists(tesseract_cmd_path):
-    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd_path
+# Check configurable Tesseract path from env or common Windows locations
+tesseract_env = os.getenv("TESSERACT_CMD")
+common_paths = [
+    tesseract_env,
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    os.path.expanduser(r"~\AppData\Local\Programs\Tesseract-OCR\tesseract.exe")
+]
+
+for p in common_paths:
+    if p and os.path.exists(p):
+        pytesseract.pytesseract.tesseract_cmd = p
+        break
+
 
 def extract_raw_ocr(crop_bgr: np.ndarray) -> str:
     """

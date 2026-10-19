@@ -3,8 +3,8 @@ import numpy as np
 
 def load_and_preprocess(image_bytes: bytes) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Decodes image bytes, creates grayscale image, applies Gaussian blur,
-    and returns adaptive threshold binary mask.
+    Decodes image bytes, applies median blur to handle paper glare,
+    and returns a robust binary mask for handwriting layout detection.
     """
     nparr = np.frombuffer(image_bytes, np.uint8)
     image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -15,17 +15,17 @@ def load_and_preprocess(image_bytes: bytes) -> tuple[np.ndarray, np.ndarray, np.
     # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    # Gaussian blur to reduce high-frequency noise
+    # Mild Gaussian blur to smooth out shadow noise
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     
-    # Adaptive thresholding to convert image to binary
+    # Adaptive thresholding calibrated for pen-on-paper lighting
     binary = cv2.adaptiveThreshold(
         blurred, 
         255, 
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
         cv2.THRESH_BINARY_INV, 
-        15, 
-        4
+        21, 
+        10
     )
     
     return image, gray, binary
